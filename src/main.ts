@@ -53,7 +53,7 @@ app.on("ready", async () => {
 // explicitly with Cmd + Q.
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin") {
-        WebtorrentClient.getClient().destroy();
+        WebtorrentClient.destroy();
 
         app.quit();
     }

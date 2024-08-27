@@ -1,43 +1,73 @@
 import type { Torrent } from "webtorrent";
-import TorrentId from "~/types/TorrentId";
 import { WebtorrentClient } from "@/controllers/webtorrent-client";
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, ipcMain, IpcMainEvent } from "electron";
 import { electronApiMethods } from "@/controllers/electron-api";
 import { catchError } from "@/lib/catchError";
 import DownloadData from "~/interfaces/DownloadData";
+import {
+    getErrorMethod,
+    getReturnMethod,
+    SetPauseOpt
+} from "../electron-api/methods";
+import { TorrentId } from "~/types";
 
 export class DownloadTorrent {
     private static torrent: Torrent;
     private static window: BrowserWindow;
 
-    static add(torrentId: TorrentId, path: string, window: BrowserWindow) {
+    static add(
+        torrentId: TorrentId,
+        path: string,
+        window: BrowserWindow,
+        event: IpcMainEvent
+    ) {
         this.window = window;
 
-        const client = WebtorrentClient.getClient();
-
-        client.add(torrentId, { path }, (torrent) => this.action(torrent));
+        WebtorrentClient.add(
+            torrentId,
+            path,
+            (torrent) => this.action(torrent),
+            () => {
+                event.sender.send(
+                    getReturnMethod(electronApiMethods.sendTorrentId)
+                );
+            },
+            () => {
+                event.sender.send(
+                    getErrorMethod(electronApiMethods.sendTorrentId)
+                );
+            }
+        );
     }
 
     static eventListener() {
         ipcMain.on(electronApiMethods.destroyDownload, () => {
-            if (this.torrent) this.torrent.destroy();
+            this.torrent.destroy();
         });
 
-        ipcMain.on(electronApiMethods.setPause, (_, state: boolean) => {
-            if (this.torrent) {
+        ipcMain.on(
+            electronApiMethods.setPause,
+            (event, { state }: SetPauseOpt) => {
                 if (state) {
-                    this.torrent.destroy();
+                    this.torrent.destroy({}, () => {
+                        event.sender.send(
+                            getReturnMethod(electronApiMethods.setPause)
+                        );
+                    });
                 } else {
-                    const client = WebtorrentClient.getClient();
-
-                    client.add(
+                    WebtorrentClient.add(
                         this.torrent.magnetURI,
-                        { path: this.torrent.path },
-                        (torrent) => this.action(torrent)
+                        this.torrent.path,
+                        (torrent) => this.action(torrent),
+                        () => {
+                            event.sender.send(
+                                getReturnMethod(electronApiMethods.setPause)
+                            );
+                        }
                     );
                 }
             }
-        });
+        );
     }
 
     private static action(torrent: Torrent) {
@@ -47,7 +77,8 @@ export class DownloadTorrent {
             this.window.webContents.send(electronApiMethods.getDownloadData, {
                 progress: torrent.progress,
                 timeRemaining: torrent.timeRemaining,
-                speed: torrent.downloadSpeed
+                speed: torrent.downloadSpeed,
+                magnetUrl: torrent.magnetURI
             } as DownloadData)
         );
 

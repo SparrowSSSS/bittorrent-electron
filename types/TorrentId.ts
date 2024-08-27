@@ -1,3 +1,1 @@
-type TorrentId = string | ArrayBuffer;
-
-export default TorrentId;
+export type TorrentId = string | ArrayBuffer;

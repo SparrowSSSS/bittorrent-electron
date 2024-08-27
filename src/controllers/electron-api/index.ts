@@ -1,14 +1,24 @@
 import { BrowserWindow, ipcMain } from "electron";
-import { electronApiMethods } from "./methods";
-import fSendMagnetUrl from "./send-torrent-id";
-import TorrentId from "~/types/TorrentId";
+import { electronApiMethods, SendTorrentIdOpt } from "./methods";
+import { DownloadTorrent } from "@/controllers/download-torrent";
+import { downloadPath } from "@/config/downloadPath";
 
 export { electronApiMethods } from "./methods";
 
 export default class ElectronAPI {
     static init() {
-        ipcMain.on(electronApiMethods.sendTorrentId, (_, id: TorrentId) =>
-            fSendMagnetUrl(id, BrowserWindow.getAllWindows()[0])
+        ipcMain.on(
+            electronApiMethods.sendTorrentId,
+            (event, { id }: SendTorrentIdOpt) => {
+                if (id instanceof ArrayBuffer) id = Buffer.from(id);
+
+                DownloadTorrent.add(
+                    id,
+                    downloadPath,
+                    BrowserWindow.getAllWindows()[0],
+                    event
+                );
+            }
         );
     }
 }
