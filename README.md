@@ -1,4 +1,4 @@
-# Bittorent client
+# Bittorent client (electron)
 
 Electron + React
 
